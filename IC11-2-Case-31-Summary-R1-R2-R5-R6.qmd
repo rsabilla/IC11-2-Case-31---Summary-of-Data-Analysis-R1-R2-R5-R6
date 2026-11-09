@@ -1,0 +1,583 @@
+---
+title: "IC11-2: Case 31 Summary of Data Analysis"
+subtitle: "R1, R2, R5, & R6 | Employees Federal Credit Union"
+author: "Ron Stephen Sabilla"
+date: today
+format:
+  revealjs:
+    output-file: index.html
+    theme: simple
+    slide-number: true
+    scrollable: true
+    smaller: true
+    code-fold: true
+    code-summary: "Show code"
+    code-tools: true
+    embed-resources: true
+    toc: true
+    toc-depth: 1
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Introduction
+
+## Employees Federal Credit Union (EFCU)
+
+-   EFCU is the credit union for employees of a Fortune 500 company.
+-   This presentation covers the **introductory-level research questions**: R1, R2, R5, and R6.
+-   The analysis uses the cleaned data I prepared in IC10-2-1 (`Case 31 Data_efcu_1_RSS_cleaned.sav`).
+
+## Problem Definition
+
+-   EFCU has a large amount of **surplus funds**.
+-   Its **loan/share ratio is lower** than other credit unions of similar size. Members save there but don't borrow there.
+-   Average earnings on its investments have declined, and profit margins are getting squeezed.
+
+## Research Objectives
+
+1.  Determine **why members are not borrowing** money from the credit union.
+2.  Determine members' **attitudes toward the overall management and operations** of the credit union.
+
+::: {.callout-note}
+The findings give management the information it needs to raise the loan/share ratio and improve profit margins.
+:::
+
+# Background and Research Questions
+
+## Research Questions Covered
+
+| RQ | Research question |
+|----|----|
+| **R1** | Why do people join the credit union? |
+| **R2** | Why do members use other financial institutions when they need to borrow funds? |
+| **R5** | How aware are members of the services offered by the credit union? |
+| **R6** | What are members' attitudes and beliefs about how effectively the credit union is operated? |
+
+These are labeled **research questions** rather than hypotheses because there isn't enough prior evidence to predict the relationships with confidence.
+
+# Methods
+
+## Research Design
+
+A **mail survey** was used because:
+
+-   EFCU membership is spread out geographically
+-   It's low cost
+-   Sensitive money questions need anonymity to get candid answers
+-   The longer turnaround of a mail survey isn't a problem for the board
+
+Questions were mostly structured, and **Likert-type scales** measured attitudes.
+
+## Population and Sampling
+
+-   **Population:** all current EFCU members
+-   **Sampling frame:** the membership list (3,531 members as of January 31)
+-   **Sampling method:** simple random sampling
+-   **Sample size:** 300 surveys mailed, with **128 usable responses**
+
+## Data Preparation
+
+Done in IC10-2-1:
+
+-   Fixed missing and incorrect variable and value labels (e.g., q8)
+-   Recoded "No Opinion" and "No answer" responses to missing (`NA`)
+-   Reverse-coded `q7r`, `q8r`, `q10r`, `q37r`, and `q13r`–`q26r` so **higher = more favorable or more familiar**
+-   Saved the result as `Case 31 Data_efcu_1_RSS_cleaned.sav`
+
+## Setup
+
+```{r}
+#| label: setup
+#| code-fold: show
+
+library(tidyverse)
+library(haven)
+library(knitr)
+library(broom)
+
+theme_set(theme_minimal(base_size = 14))
+
+case31 <- read_sav("Case 31 Data_efcu_1_RSS_cleaned.sav")
+
+# Helper: one-sample t-test summarized in one row
+one_t <- function(data, var, mu = 3) {
+  t.test(data[[var]], mu = mu) |>
+    tidy() |>
+    transmute(
+      variable = var, mean = estimate, mu = mu,
+      t = statistic, df = parameter, p.value, conf.low, conf.high
+    )
+}
+
+# Helper: format p-values for tables
+fmt_p <- \(p) if_else(p < .001, "< .001", sprintf("%.3f", p))
+
+# Helper: frequency table with percentages, keeping value labels
+freq_tbl <- function(data, var) {
+  data |>
+    count(level = as_factor(.data[[var]])) |>
+    mutate(percent = round(n / sum(n) * 100, 1))
+}
+```
+
+## Sample Characteristics
+
+```{r}
+#| label: sample
+
+n_total <- nrow(case31)
+
+case31 |>
+  count(`Lives in HQ area` = as_factor(q38)) |>
+  mutate(percent = round(n / sum(n) * 100, 1)) |>
+  kable()
+```
+
+-   **Number of participants:** `r n_total`
+-   The survey has **no demographic questions** (gender, ethnicity, income, education), so residence (q38) is the only way to describe the sample.
+
+# Analysis and Results
+
+# R1: Why do people join the credit union?
+
+## R1: Overview
+
+-   **Construct:** reasons members join the credit union
+-   **Operationalization:** `q7r` (rates the CU pays on savings accounts)
+-   **Scale:** 1–5 Likert-type (1 = Very Low, 5 = Very High), treated as approximately interval
+-   **Statistics:** descriptive statistics, followed by a **one-sample t-test** against 3 ("Average")
+
+## R1: Results
+
+::: panel-tabset
+### Frequency
+
+```{r}
+#| label: r1-freq
+
+freq_tbl(case31, "q7r") |> kable(col.names = c("Savings rates", "n", "%"))
+```
+
+### Descriptives
+
+```{r}
+#| label: r1-desc
+
+case31 |>
+  summarise(
+    n = sum(!is.na(q7r)),
+    mean = mean(q7r, na.rm = TRUE),
+    sd = sd(q7r, na.rm = TRUE),
+    median = median(q7r, na.rm = TRUE),
+    min = min(q7r, na.rm = TRUE),
+    max = max(q7r, na.rm = TRUE)
+  ) |>
+  kable(digits = 2)
+```
+
+### Plot
+
+```{r}
+#| label: r1-plot
+#| fig-height: 4
+
+case31 |>
+  filter(!is.na(q7r)) |>
+  ggplot(aes(x = as_factor(q7r))) +
+  geom_bar(fill = "#2C6E91") +
+  labs(x = "Savings rates (q7r)", y = "Number of members")
+```
+
+### t-test
+
+$H_0: \mu = 3$ (average)  $H_A: \mu \neq 3$
+
+```{r}
+#| label: r1-ttest
+
+r1 <- t.test(case31$q7r, mu = 3)
+r1
+```
+:::
+
+## R1: Insights
+
+```{r}
+#| label: r1-inline
+#| include: false
+
+r1_pct_avg <- round(mean(case31$q7r == 3, na.rm = TRUE) * 100)
+```
+
+-   Most members (`r r1_pct_avg`% of those with an opinion) think the savings rate EFCU pays is **average**.
+-   The mean is `r round(r1$estimate, 2)`, which is **not significantly different from 3** (*t*(`r r1$parameter`) = `r round(r1$statistic, 2)`, *p* = `r round(r1$p.value, 3)`).
+-   **Takeaway:** savings rates aren't a strong reason to join or stay. Members likely join for convenience (it's their employer's credit union) and other services, not for better-than-average returns.
+
+# R2: Why do members borrow elsewhere?
+
+## R2: Overview
+
+-   **Construct:** reasons members use loans from other financial institutions
+-   **Operationalization:**
+    -   `q8r`: rates the CU charges on loans (1 = Very Low, 5 = Very High)
+    -   `q30`: "CU loan rates are lower than other institutions" (1 = Strongly Disagree, 5 = Strongly Agree)
+-   **Scale:** 1–5 Likert-type, treated as approximately interval
+-   **Statistics:** descriptive statistics, followed by **one-sample t-tests** against 3
+
+## R2: Results
+
+::: panel-tabset
+### Frequency
+
+```{r}
+#| label: r2-freq
+
+freq_tbl(case31, "q8r") |> kable(col.names = c("Loan rates charged (q8r)", "n", "%"))
+
+freq_tbl(case31, "q30") |> kable(col.names = c("CU rates lower (q30)", "n", "%"))
+```
+
+### Plot
+
+```{r}
+#| label: r2-plot
+#| fig-height: 4
+
+case31 |>
+  select(`Loan rates charged (q8r)` = q8r, `CU rates lower (q30)` = q30) |>
+  zap_labels() |>
+  pivot_longer(everything(), names_to = "item", values_to = "value") |>
+  filter(!is.na(value)) |>
+  ggplot(aes(x = factor(value))) +
+  geom_bar(fill = "#2C6E91") +
+  facet_wrap(~item) +
+  labs(x = "Response (1 = lowest, 5 = highest)", y = "Number of members")
+```
+
+### t-tests
+
+$H_0: \mu = 3$  $H_A: \mu \neq 3$
+
+```{r}
+#| label: r2-ttest
+
+r2 <- bind_rows(one_t(case31, "q8r"), one_t(case31, "q30"))
+
+r2 |> mutate(p.value = fmt_p(p.value)) |> kable(digits = 3)
+```
+:::
+
+## R2: Insights
+
+```{r}
+#| label: r2-inline
+#| include: false
+
+r2_q8 <- r2 |> filter(variable == "q8r")
+r2_q30 <- r2 |> filter(variable == "q30")
+r2_agree <- round(mean(case31$q30 >= 4) * 100)
+r2_highrate <- round(mean(case31$q8r >= 4, na.rm = TRUE) * 100)
+```
+
+-   **Loan rates (q8r):** the mean is `r round(r2_q8$mean, 2)`, `r if (r2_q8$p.value < .05) "significantly higher than" else "not significantly different from"` "Average" (*p* = `r round(r2_q8$p.value, 3)`). About `r r2_highrate`% of members think EFCU's loan rates are high or very high.
+-   **Rates vs. competitors (q30):** the mean is `r round(r2_q30$mean, 2)`, `r if (r2_q30$p.value < .05) "significantly different from" else "not significantly different from"` "Uncertain" (*p* = `r round(r2_q30$p.value, 3)`). Only `r r2_agree`% agree that EFCU's rates are lower than other institutions'.
+-   **Takeaway:** members don't see EFCU's loan rates as a reason to borrow there. Nothing makes the CU stand out on price, so members have no reason to choose it over a bank. This is a likely reason for the low loan/share ratio.
+
+# R5: How aware are members of CU services?
+
+## R5: Overview
+
+-   **Construct:** awareness of services
+-   **Operationalization:** `q13r`–`q26r` (14 services)
+-   **Scale:** ordinal (1 = Unaware, 2 = Aware but Have Not Used, 3 = Aware and Have Used)
+-   **Statistics:** frequency distributions, followed by a **chi-square goodness-of-fit test** for each service
+
+## R5: Demonstration with q13r (Regular share account)
+
+::: panel-tabset
+### Frequency
+
+```{r}
+#| label: r5-q13-freq
+
+freq_tbl(case31, "q13r") |> kable(col.names = c("Regular share account", "n", "%"))
+```
+
+### Plot
+
+```{r}
+#| label: r5-q13-plot
+#| fig-height: 4
+
+case31 |>
+  ggplot(aes(x = as_factor(q13r), fill = as_factor(q13r))) +
+  geom_bar(show.legend = FALSE) +
+  scale_fill_manual(values = c("#D9D9D9", "#8FB9D1", "#2C6E91")) +
+  labs(x = "Regular share account (q13r)", y = "Number of members")
+```
+
+### Goodness of fit
+
+$H_0$: the three awareness levels are equally likely (1/3 each)
+
+$H_A$: the awareness levels are not equally likely
+
+```{r}
+#| label: r5-q13-chisq
+
+table(factor(case31$q13r, levels = 1:3)) |>
+  chisq.test(p = c(1/3, 1/3, 1/3))
+```
+:::
+
+## R5: All 14 Services
+
+```{r}
+#| label: r5-all
+
+service_labels <- c(
+  q13r = "Regular share account", q14r = "Special subaccounts",
+  q15r = "Christmas club account", q16r = "IRA",
+  q17r = "Master credit card", q18r = "Signature loans",
+  q19r = "New car loans", q20r = "Late model car loans",
+  q21r = "Older model car loans", q22r = "Household goods loans",
+  q23r = "Recreational loans", q24r = "Share collateralized loan",
+  q25r = "IRA loans", q26r = "Line of credit loans"
+)
+
+r5 <- map_dfr(names(service_labels), \(v) {
+  counts <- table(factor(case31[[v]], levels = 1:3))
+  test <- chisq.test(counts, p = c(1/3, 1/3, 1/3))
+  tibble(
+    service = service_labels[[v]],
+    `Unaware %` = round(counts[["1"]] / sum(counts) * 100, 1),
+    `Aware, not used %` = round(counts[["2"]] / sum(counts) * 100, 1),
+    `Aware & used %` = round(counts[["3"]] / sum(counts) * 100, 1),
+    `Chi-square` = round(unname(test$statistic), 2),
+    df = unname(test$parameter),
+    p = fmt_p(test$p.value)
+  )
+})
+
+r5 |> arrange(desc(`Aware & used %`)) |> kable()
+```
+
+## R5: Awareness Chart
+
+```{r}
+#| label: r5-plot
+#| fig-height: 5.5
+#| fig-width: 10
+
+case31 |>
+  select(all_of(names(service_labels))) |>
+  pivot_longer(everything(), names_to = "item", values_to = "level") |>
+  mutate(
+    service = service_labels[item],
+    level = factor(level, levels = 1:3,
+                   labels = c("Unaware", "Aware but not used", "Aware and used"))
+  ) |>
+  count(service, level) |>
+  group_by(service) |>
+  mutate(pct = n / sum(n) * 100) |>
+  ggplot(aes(x = pct, y = reorder(service, pct * (level == "Aware and used")), fill = level)) +
+  geom_col() +
+  scale_fill_manual(values = c("#D9D9D9", "#8FB9D1", "#2C6E91")) +
+  labs(x = "% of members", y = NULL, fill = NULL) +
+  theme(legend.position = "top")
+```
+
+## R5: Insights
+
+```{r}
+#| label: r5-inline
+#| include: false
+
+r5_sig <- sum(r5$p == "< .001" | suppressWarnings(as.numeric(r5$p)) < .05, na.rm = TRUE)
+r5_top <- r5 |> slice_max(`Aware & used %`, n = 1)
+r5_low_use <- sum(r5$`Aware & used %` < 20)
+```
+
+-   For **all `r r5_sig` of 14 services**, awareness levels are significantly different from an even split (*p* < .05), so members aren't spread evenly across the levels.
+-   **Use is low across the board.** `r r5_low_use` of 14 services have been used by fewer than 20% of members. The most used is the `r r5_top$service` (`r r5_top$"Aware & used %"`%).
+-   **For most loans, the issue is use, not awareness.** Most members know about new car loans and signature loans, but very few have used them.
+-   Some services (IRA loans, share collateralized loans, recreational loans) have high **unawareness**, so they need basic promotion.
+-   One result looks odd: 65% are coded **unaware of the regular share account**, even though members normally need one to join. This may be a coding issue in the original data and is worth checking against the paper surveys.
+-   **Takeaway:** EFCU should promote its loan products and give members a reason to choose them (ties back to R2's rate perception).
+
+# R6: How effectively is the CU operated?
+
+## R6: Overview
+
+-   **Construct:** attitudes toward operational effectiveness
+-   **Operationalization and statistics:**
+
+| Variable(s) | Measure | Scale | Statistics |
+|----|----|----|----|
+| `q9`, `q10r` | Statement frequency, statement accuracy | Ordinal | Frequencies / chi-square goodness of fit |
+| `q11`, `q12` | Statements understandable, account kept confidential | Nominal (yes/no) | Frequencies / chi-square goodness of fit |
+| `q31`–`q34` | Confidentiality, prompt processing, meets needs, simple applications | Interval (1–5) | Descriptives / one-sample t-test |
+| `q37r` | Overall rating of management | Interval (1–5) | Descriptives / one-sample t-test |
+
+## R6: Account Statements (q9, q10r, q11, q12)
+
+::: panel-tabset
+### Frequencies
+
+```{r}
+#| label: r6-statement-freq
+
+freq_tbl(case31, "q9") |> kable(col.names = c("Statement frequency (q9)", "n", "%"))
+freq_tbl(case31, "q10r") |> kable(col.names = c("Statement accuracy (q10r)", "n", "%"))
+freq_tbl(case31, "q11") |> kable(col.names = c("Statements understandable (q11)", "n", "%"))
+freq_tbl(case31, "q12") |> kable(col.names = c("Account confidential (q12)", "n", "%"))
+```
+
+### Goodness of fit
+
+$H_0$: response categories are equally likely  $H_A$: they are not
+
+```{r}
+#| label: r6-statement-chisq
+
+gof <- function(var, label) {
+  counts <- table(case31[[var]])  # observed categories only
+  test <- chisq.test(counts)
+  tibble(measure = label, categories = length(counts),
+         `Chi-square` = unname(test$statistic), df = unname(test$parameter),
+         p = test$p.value)
+}
+
+r6_gof <- bind_rows(
+  gof("q9", "Statement frequency (q9)"),
+  gof("q10r", "Statement accuracy (q10r)"),
+  gof("q11", "Statements understandable (q11)"),
+  gof("q12", "Account confidential (q12)")
+)
+
+r6_gof |> mutate(p = fmt_p(p)) |> kable(digits = 2)
+```
+
+Tested on the categories members actually chose. For q9, no one chose "Too Often", "Very Often", or "Never".
+:::
+
+## R6: Operations Items and Overall Rating (q31–q34, q37r)
+
+::: panel-tabset
+### Descriptives
+
+```{r}
+#| label: r6-ops-desc
+
+ops_labels <- c(
+  q31 = "Keeps information confidential (q31)",
+  q32 = "Prompt loan processing (q32)",
+  q33 = "Services meet members' needs (q33)",
+  q34 = "Loan applications simple (q34)",
+  q37r = "Overall rating of management (q37r)"
+)
+
+case31 |>
+  select(all_of(names(ops_labels))) |>
+  zap_labels() |>
+  pivot_longer(everything(), names_to = "variable", values_to = "value") |>
+  summarise(
+    n = sum(!is.na(value)),
+    mean = mean(value, na.rm = TRUE),
+    sd = sd(value, na.rm = TRUE),
+    `% agree / good+` = mean(value >= 4, na.rm = TRUE) * 100,
+    .by = variable
+  ) |>
+  mutate(variable = ops_labels[variable]) |>
+  kable(digits = 2)
+```
+
+### Plot
+
+```{r}
+#| label: r6-ops-plot
+#| fig-height: 4.5
+
+case31 |>
+  select(all_of(names(ops_labels))) |>
+  zap_labels() |>
+  pivot_longer(everything(), names_to = "variable", values_to = "value") |>
+  summarise(mean = mean(value, na.rm = TRUE), .by = variable) |>
+  mutate(variable = ops_labels[variable]) |>
+  ggplot(aes(x = mean, y = reorder(variable, mean))) +
+  geom_col(fill = "#2C6E91", width = 0.6) +
+  geom_text(aes(label = sprintf("%.2f", mean)), hjust = -0.2) +
+  geom_vline(xintercept = 3, linetype = "dashed", color = "gray50") +
+  scale_x_continuous(limits = c(0, 5.3), breaks = 1:5) +
+  labs(x = "Mean (3 = neutral)", y = NULL)
+```
+
+### t-tests
+
+$H_0: \mu = 3$ (neutral)  $H_A: \mu \neq 3$
+
+```{r}
+#| label: r6-ops-ttest
+
+r6_t <- map_dfr(names(ops_labels), \(v) one_t(case31, v)) |>
+  mutate(variable = ops_labels[variable])
+
+r6_t |> mutate(p.value = fmt_p(p.value)) |> kable(digits = 3)
+```
+:::
+
+## R6: Insights
+
+```{r}
+#| label: r6-inline
+#| include: false
+
+pct <- \(x) round(mean(x, na.rm = TRUE) * 100)
+r6_q9_ok <- pct(case31$q9 == 3)
+r6_q10_good <- pct(case31$q10r >= 3)
+r6_q11_yes <- pct(case31$q11 == 1)
+r6_q12_yes <- pct(case31$q12 == 1)
+r6_q37 <- r6_t |> filter(str_detect(variable, "q37r"))
+r6_q37_good <- pct(case31$q37r >= 4)
+```
+
+-   **Statements are a strength.** `r r6_q9_ok`% say statement frequency is about right (the rest say "not often enough"), `r r6_q10_good`% rate accuracy good or excellent, and `r r6_q11_yes`% find statements easy to understand.
+-   **Confidentiality:** `r r6_q12_yes`% say yes to q12, and q31 is rated well above neutral.
+-   **All four operations items (q31–q34) are significantly above neutral** (*p* < .05), but **meeting needs (q33)** and **simple applications (q34)** score the lowest. Those are the areas to improve.
+-   **Overall rating (q37r):** the mean is `r round(r6_q37$mean, 2)` (*p* < .001 vs. 3), and `r r6_q37_good`% rate management good or excellent.
+-   **Takeaway:** members think the CU runs well overall. The weak spots are on the loan side (processing, applications, meeting needs), not day-to-day operations.
+
+# Summary
+
+## Summary of Findings
+
+| RQ | Analysis | Key finding |
+|----|----|----|
+| **R1** | One-sample t-test | Savings rates seen as **average**; not a strong reason to join |
+| **R2** | One-sample t-tests | Loan rates **not seen as lower** than competitors; no price reason to borrow at EFCU |
+| **R5** | Chi-square goodness of fit | **Low use** of almost every service; many loans are known but not used |
+| **R6** | Chi-square GOF / one-sample t-tests | Operations and statements rated **positively**; loan applications and meeting needs are weakest |
+
+## Recommendations
+
+1.  **Review loan pricing** against local competitors, and clearly communicate rates where EFCU is competitive.
+2.  **Promote loan products** with a focus on *why* members should choose EFCU, since awareness is often already there.
+3.  **Simplify loan applications** and speed up processing to remove friction for borrowers.
+4.  **Keep strengths visible:** accurate statements, confidentiality, and solid management are good selling points.
+
+## Limitations
+
+-   Small sample (128 usable responses) and no demographic variables
+-   Likert items treated as approximately interval
+-   Some items have missing data (e.g., q8r is missing 16% of its answers)
+-   Results describe one survey at one point in time
+
+# Appendix
+
+## Links
+
+-   [GitHub Repo](https://github.com/rsabilla/IC11-2-Case-31-Summary-R1-R2-R5-R6)
+-   [GitHub Pages](https://rsabilla.github.io/IC11-2-Case-31-Summary-R1-R2-R5-R6/)
